@@ -71,6 +71,12 @@ const AUTH_CHOICE_GROUP_DEFS: {
     choices: ["xai-api-key"],
   },
   {
+    value: "deepinfra",
+    label: "DeepInfra",
+    hint: "API key - Native API support",
+    choices: ["deepinfra-api-key"],
+  },
+  {
     value: "openrouter",
     label: "OpenRouter",
     hint: "API key",
@@ -180,6 +186,11 @@ const BASE_AUTH_CHOICE_OPTIONS: ReadonlyArray<AuthChoiceOption> = [
   },
   { value: "openai-api-key", label: "OpenAI API key" },
   { value: "xai-api-key", label: "xAI (Grok) API key" },
+  {
+    value: "deepinfra-api-key",
+    label: "DeepInfra API key",
+    hint: "Native API access to DeepSeek, Llama, Qwen models",
+  },
   {
     value: "qianfan-api-key",
     label: "Qianfan API key",
