@@ -52,6 +52,12 @@ export {
   applyOpencodeZenProviderConfig,
 } from "./onboard-auth.config-opencode.js";
 export {
+  applyDeepInfraConfig,
+  applyDeepInfraProviderConfig,
+  DEEPINFRA_BASE_URL,
+  DEEPINFRA_DEFAULT_MODEL_REF,
+} from "./onboard-auth.config-deepinfra.js";
+export {
   CLOUDFLARE_AI_GATEWAY_DEFAULT_MODEL_REF,
   LITELLM_DEFAULT_MODEL_REF,
   OPENROUTER_DEFAULT_MODEL_REF,
@@ -73,6 +79,7 @@ export {
   setXiaomiApiKey,
   setZaiApiKey,
   setXaiApiKey,
+  setDeepInfraApiKey,
   writeOAuthCredentials,
   HUGGINGFACE_DEFAULT_MODEL_REF,
   VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF,

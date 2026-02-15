@@ -64,8 +64,14 @@ import {
   setVercelAiGatewayApiKey,
   setXiaomiApiKey,
   setZaiApiKey,
+  setDeepInfraApiKey,
   ZAI_DEFAULT_MODEL_REF,
 } from "./onboard-auth.js";
+import {
+  applyDeepInfraConfig,
+  applyDeepInfraProviderConfig,
+  DEEPINFRA_DEFAULT_MODEL_REF,
+} from "./onboard-auth.config-deepinfra.js";
 import { OPENCODE_ZEN_DEFAULT_MODEL } from "./opencode-zen-model-default.js";
 import { detectZaiEndpoint } from "./zai-endpoint-detect.js";
 
@@ -124,6 +130,8 @@ export async function applyAuthChoiceApiProviders(
       authChoice = "opencode-zen";
     } else if (params.opts.tokenProvider === "qianfan") {
       authChoice = "qianfan-api-key";
+    } else if (params.opts.tokenProvider === "deepinfra") {
+      authChoice = "deepinfra-api-key";
     }
   }
 
@@ -951,6 +959,65 @@ export async function applyAuthChoiceApiProviders(
         applyDefaultConfig: applyQianfanConfig,
         applyProviderConfig: applyQianfanProviderConfig,
         noteDefault: QIANFAN_DEFAULT_MODEL_REF,
+        noteAgentModel,
+        prompter: params.prompter,
+      });
+      nextConfig = applied.config;
+      agentModelOverride = applied.agentModelOverride ?? agentModelOverride;
+    }
+    return { config: nextConfig, agentModelOverride };
+  }
+
+  if (authChoice === "deepinfra-api-key") {
+    let hasCredential = false;
+
+    if (!hasCredential && params.opts?.token && params.opts?.tokenProvider === "deepinfra") {
+      await setDeepInfraApiKey(normalizeApiKeyInput(params.opts.token), params.agentDir);
+      hasCredential = true;
+    }
+
+    if (!hasCredential) {
+      await params.prompter.note(
+        [
+          "DeepInfra provides access to leading open-source models including DeepSeek V3, Llama, Qwen, and more.",
+          "Native API support for full parameter control and model-specific optimizations.",
+          "Get your API key at: https://deepinfra.com/dash/api_keys",
+        ].join("\n"),
+        "DeepInfra",
+      );
+    }
+
+    const envKey = resolveEnvApiKey("deepinfra");
+    if (envKey) {
+      const useExisting = await params.prompter.confirm({
+        message: `Use existing DEEPINFRA_API_KEY (${envKey.source}, ${formatApiKeyPreview(envKey.apiKey)})?`,
+        initialValue: true,
+      });
+      if (useExisting) {
+        await setDeepInfraApiKey(envKey.apiKey, params.agentDir);
+        hasCredential = true;
+      }
+    }
+    if (!hasCredential) {
+      const key = await params.prompter.text({
+        message: "Enter DeepInfra API key",
+        validate: validateApiKeyInput,
+      });
+      await setDeepInfraApiKey(normalizeApiKeyInput(String(key ?? "")), params.agentDir);
+    }
+    nextConfig = applyAuthProfileConfig(nextConfig, {
+      profileId: "deepinfra:default",
+      provider: "deepinfra",
+      mode: "api_key",
+    });
+    {
+      const applied = await applyDefaultModelChoice({
+        config: nextConfig,
+        setDefaultModel: params.setDefaultModel,
+        defaultModel: DEEPINFRA_DEFAULT_MODEL_REF,
+        applyDefaultConfig: applyDeepInfraConfig,
+        applyProviderConfig: applyDeepInfraProviderConfig,
+        noteDefault: DEEPINFRA_DEFAULT_MODEL_REF,
         noteAgentModel,
         prompter: params.prompter,
       });

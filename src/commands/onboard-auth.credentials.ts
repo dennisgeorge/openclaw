@@ -274,3 +274,15 @@ export function setXaiApiKey(key: string, agentDir?: string) {
     agentDir: resolveAuthAgentDir(agentDir),
   });
 }
+
+export async function setDeepInfraApiKey(key: string, agentDir?: string) {
+  upsertAuthProfile({
+    profileId: "deepinfra:default",
+    credential: {
+      type: "api_key",
+      provider: "deepinfra",
+      key,
+    },
+    agentDir: resolveAuthAgentDir(agentDir),
+  });
+}
