@@ -12,7 +12,7 @@ import {
 
 export { DEEPINFRA_BASE_URL };
 
-export const DEEPINFRA_DEFAULT_MODEL_ID = "deepseek-ai/DeepSeek-V3";
+export const DEEPINFRA_DEFAULT_MODEL_ID = "deepseek-ai/DeepSeek-V3.2";
 export const DEEPINFRA_DEFAULT_MODEL_REF = `deepinfra/${DEEPINFRA_DEFAULT_MODEL_ID}`;
 
 /**
@@ -23,7 +23,7 @@ export function applyDeepInfraProviderConfig(cfg: OpenClawConfig): OpenClawConfi
   const models: Record<string, AgentModelEntryConfig> = { ...cfg.agents?.defaults?.models };
   models[DEEPINFRA_DEFAULT_MODEL_REF] = {
     ...models[DEEPINFRA_DEFAULT_MODEL_REF],
-    alias: models[DEEPINFRA_DEFAULT_MODEL_REF]?.alias ?? "DeepSeek V3",
+    alias: models[DEEPINFRA_DEFAULT_MODEL_REF]?.alias ?? "DeepSeek V3.2",
   };
 
   const deepInfraModels = DEEPINFRA_MODEL_CATALOG.map(buildDeepInfraModelDefinition);
