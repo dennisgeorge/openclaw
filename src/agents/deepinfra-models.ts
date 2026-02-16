@@ -18,6 +18,20 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     },
   },
   {
+    id: "zai-org/GLM-5",
+    name: "GLM-5",
+    reasoning: true,
+    input: ["text"],
+    contextWindow: 202752,
+    maxTokens: 202752,
+    cost: {
+      input: 0.8,
+      output: 2.56,
+      cacheRead: 0.16,
+      cacheWrite: 0.8,
+    },
+  },
+  {
     id: "deepseek-ai/DeepSeek-R1",
     name: "DeepSeek R1",
     reasoning: true,
