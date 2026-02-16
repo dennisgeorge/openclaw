@@ -14,6 +14,11 @@ import {
   GOOGLE_GEMINI_DEFAULT_MODEL,
 } from "./google-gemini-model-default.js";
 import {
+  applyDeepInfraConfig,
+  applyDeepInfraProviderConfig,
+  DEEPINFRA_DEFAULT_MODEL_REF,
+} from "./onboard-auth.config-deepinfra.js";
+import {
   applyAuthProfileConfig,
   applyCloudflareAiGatewayConfig,
   applyCloudflareAiGatewayProviderConfig,
@@ -67,11 +72,6 @@ import {
   setDeepInfraApiKey,
   ZAI_DEFAULT_MODEL_REF,
 } from "./onboard-auth.js";
-import {
-  applyDeepInfraConfig,
-  applyDeepInfraProviderConfig,
-  DEEPINFRA_DEFAULT_MODEL_REF,
-} from "./onboard-auth.config-deepinfra.js";
 import { OPENCODE_ZEN_DEFAULT_MODEL } from "./opencode-zen-model-default.js";
 import { detectZaiEndpoint } from "./zai-endpoint-detect.js";
 
@@ -979,7 +979,7 @@ export async function applyAuthChoiceApiProviders(
     if (!hasCredential) {
       await params.prompter.note(
         [
-          "DeepInfra provides access to leading open-source models including DeepSeek V3, Llama, Qwen, and more.",
+          "DeepInfra provides access to leading open-source models including DeepSeek V3.2, Llama, Qwen, and more.",
           "Native API support for full parameter control and model-specific optimizations.",
           "Get your API key at: https://deepinfra.com/dash/api_keys",
         ].join("\n"),

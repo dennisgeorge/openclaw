@@ -4,17 +4,17 @@ export const DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai";
 
 export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
   {
-    id: "deepseek-ai/DeepSeek-V3",
-    name: "DeepSeek V3",
-    reasoning: false,
+    id: "deepseek-ai/DeepSeek-V3.2",
+    name: "DeepSeek V3.2",
+    reasoning: true,
     input: ["text"],
-    contextWindow: 65536,
-    maxTokens: 8192,
+    contextWindow: 163840,
+    maxTokens: 163840,
     cost: {
-      input: 0.27,
-      output: 1.10,
-      cacheRead: 0.27,
-      cacheWrite: 0.27,
+      input: 0.26,
+      output: 0.38,
+      cacheRead: 0.13,
+      cacheWrite: 0.26,
     },
   },
   {
@@ -40,7 +40,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     maxTokens: 4096,
     cost: {
       input: 0.35,
-      output: 0.40,
+      output: 0.4,
       cacheRead: 0.35,
       cacheWrite: 0.35,
     },
@@ -54,7 +54,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     maxTokens: 32768,
     cost: {
       input: 0.35,
-      output: 0.40,
+      output: 0.4,
       cacheRead: 0.35,
       cacheWrite: 0.35,
     },
@@ -68,7 +68,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     maxTokens: 8192,
     cost: {
       input: 0.35,
-      output: 0.40,
+      output: 0.4,
       cacheRead: 0.35,
       cacheWrite: 0.35,
     },
@@ -82,7 +82,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     maxTokens: 8192,
     cost: {
       input: 0.35,
-      output: 0.40,
+      output: 0.4,
       cacheRead: 0.35,
       cacheWrite: 0.35,
     },
@@ -96,7 +96,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     maxTokens: 4096,
     cost: {
       input: 0.35,
-      output: 0.40,
+      output: 0.4,
       cacheRead: 0.35,
       cacheWrite: 0.35,
     },
@@ -157,5 +157,9 @@ export function buildDeepInfraModelDefinition(
     cost: model.cost,
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
+    compat: {
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+    },
   };
 }
