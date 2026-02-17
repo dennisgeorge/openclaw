@@ -34,6 +34,7 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
   {
     id: "moonshotai/Kimi-K2.5",
     name: "Kimi K2.5",
+    api: "deepinfra-inference",
     reasoning: true,
     input: ["text", "image"],
     contextWindow: 262144,
@@ -176,18 +177,24 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
 export function buildDeepInfraModelDefinition(
   model: (typeof DEEPINFRA_MODEL_CATALOG)[number],
 ): ModelDefinitionConfig {
+  const api = model.api ?? "openai-completions";
   return {
     id: model.id,
     name: model.name,
-    api: "openai-completions",
+    api,
     reasoning: model.reasoning,
     input: model.input,
     cost: model.cost,
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
-    compat: {
-      supportsDeveloperRole: false,
-      supportsReasoningEffort: false,
-    },
+    // Native inference API doesn't need OpenAI compat shims
+    ...(api === "openai-completions"
+      ? {
+          compat: {
+            supportsDeveloperRole: false,
+            supportsReasoningEffort: false,
+          },
+        }
+      : {}),
   };
 }
