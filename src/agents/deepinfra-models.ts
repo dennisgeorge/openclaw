@@ -32,6 +32,20 @@ export const DEEPINFRA_MODEL_CATALOG: ModelDefinitionConfig[] = [
     },
   },
   {
+    id: "moonshotai/Kimi-K2.5",
+    name: "Kimi K2.5",
+    reasoning: true,
+    input: ["text", "image"],
+    contextWindow: 262144,
+    maxTokens: 262144,
+    cost: {
+      input: 0.45,
+      output: 2.25,
+      cacheRead: 0.07,
+      cacheWrite: 0.45,
+    },
+  },
+  {
     id: "deepseek-ai/DeepSeek-R1",
     name: "DeepSeek R1",
     reasoning: true,
