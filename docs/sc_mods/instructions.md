@@ -17,7 +17,7 @@ const deepinfra = new TextGeneration('deepseek-ai/DeepSeek-V3.2', process.env.DE
 
 fastify.post('/v1/chat/completions', async (req, reply) => {
   const { messages, model, stream, temperature } = req.body;
-  
+
   // Convert OpenAI messages → DeepInfra input
   const input = messages.map(m => `${m.role}: ${m.content}`).join('\n');
   const nativeReq = {
@@ -26,10 +26,10 @@ fastify.post('/v1/chat/completions', async (req, reply) => {
     max_new_tokens: 2048,
     stop: ['<|eot_id|>']
   };
-  
+
   const response = await deepinfra.generate(nativeReq);
   const generated = response.results[^15_0].generated_text;
-  
+
   // Convert back to OpenAI format
   reply.send({
     choices: [{
@@ -48,10 +48,9 @@ fastify.listen({ port: 8001 });
 llm:
   provider: openai
   baseUrl: "http://localhost:8001/v1"
-  apiKey: "fake-key"  # ignored by proxy
+  apiKey: "fake-key" # ignored by proxy
   model: "deepseek-v3.2"
 ```
-
 
 ### 2. **Fork + Custom LLM Class (Production)**
 
@@ -65,7 +64,7 @@ class DeepInfraLLM {
   constructor(modelId, apiKey) {
     this.client = new TextGeneration(modelId, apiKey);
   }
-  
+
   async generate(messages, options = {}) {
     const input = this.formatInput(messages);
     const response = await this.client.generate({
@@ -75,7 +74,7 @@ class DeepInfraLLM {
     });
     return response.results[^15_0].generated_text;
   }
-  
+
   formatInput(messages) {
     return messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
   }
@@ -88,9 +87,8 @@ module.exports = DeepInfraLLM;
 
 ```javascript
 // Update Clawbot's LLM registry
-registerLLM('deepinfra', DeepInfraLLM);
+registerLLM("deepinfra", DeepInfraLLM);
 ```
-
 
 ### 3. **K8s‑Native Pattern (Your stack)**
 
@@ -122,7 +120,6 @@ spec:
           value: "http://localhost:8001"
 ```
 
-
 ## Why proxy vs. OpenAI‑compatible?
 
 DeepInfra's native API gives you:
@@ -139,10 +136,10 @@ DeepInfra's native API gives you:
 ```yaml
 # clawbot-config.yaml for CSO
 llm:
-  provider: proxy  # or openai if using proxy
+  provider: proxy # or openai if using proxy
   baseUrl: "http://openclaw-deepinfra:8001/v1"
   model: "deepseek-ai/DeepSeek-V3.2"
-  
+
 strategy:
   temperature: 0.3
   max_tokens: 4096
@@ -176,7 +173,6 @@ This gives you **full DeepInfra native capabilities** while keeping Clawbot's ag
 
 [^15_10]: https://deepinfra.com/docs/data
 
-
 ---
 
 # not clawbot. All the discussion here is about OpenClaw
@@ -195,12 +191,11 @@ Same proxy code as above, but configure OpenClaw's `config.yaml`:
 # openclaw-config.yaml
 llm:
   provider: "openai-compatible"
-  base_url: "http://localhost:8001/v1"  # Your DeepInfra proxy
-  api_key: "fake"  # Ignored by proxy
+  base_url: "http://localhost:8001/v1" # Your DeepInfra proxy
+  api_key: "fake" # Ignored by proxy
   model: "deepseek-v3.2"
   temperature: 0.3
 ```
-
 
 ### 2. **Custom OpenClaw LLM Provider**
 
@@ -208,28 +203,28 @@ OpenClaw's plugin system (in `src/providers/`) lets you register custom provider
 
 ```javascript
 // src/providers/deepinfra.js
-const { TextGeneration } = require('deepinfra');
+const { TextGeneration } = require("deepinfra");
 
 class DeepInfraProvider {
   constructor(apiKey) {
     this.apiKey = apiKey;
   }
-  
+
   async chat(messages, options) {
-    const client = new TextGeneration('deepseek-ai/DeepSeek-V3.2', this.apiKey);
-    const input = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
-    
+    const client = new TextGeneration("deepseek-ai/DeepSeek-V3.2", this.apiKey);
+    const input = messages.map((m) => `${m.role}: ${m.content}`).join("\n\n");
+
     const result = await client.generate({
       input,
       temperature: options.temperature || 0.7,
       max_new_tokens: options.max_tokens || 4096,
       repetition_penalty: 1.1,
-      top_p: 0.9
+      top_p: 0.9,
     });
-    
+
     return {
       content: result.results[0].generated_text,
-      role: 'assistant'
+      role: "assistant",
     };
   }
 }
@@ -241,9 +236,8 @@ Register in OpenClaw's provider registry:
 
 ```javascript
 // In OpenClaw main config
-OpenClaw.providers.register('deepinfra', DeepInfraProvider);
+OpenClaw.providers.register("deepinfra", DeepInfraProvider);
 ```
-
 
 ### 3. **K8s Sidecar Deployment**
 
@@ -256,19 +250,18 @@ spec:
   template:
     spec:
       containers:
-      - name: deepinfra-proxy
-        image: your-deepinfra-proxy:latest
-        ports:
-        - containerPort: 8001
-      - name: openclaw
-        image: openclaw:latest
-        env:
-        - name: LLM_BASE_URL
-          value: "http://localhost:8001/v1"
-        - name: LLM_MODEL
-          value: "deepseek-v3.2"
+        - name: deepinfra-proxy
+          image: your-deepinfra-proxy:latest
+          ports:
+            - containerPort: 8001
+        - name: openclaw
+          image: openclaw:latest
+          env:
+            - name: LLM_BASE_URL
+              value: "http://localhost:8001/v1"
+            - name: LLM_MODEL
+              value: "deepseek-v3.2"
 ```
-
 
 ## Why this works for your CSO/CTO stack
 
@@ -278,4 +271,3 @@ spec:
 - **K8s-native scaling** with GPU sidecars for your agent teams
 
 The proxy pattern is production-ready in ~30 minutes and gives you DeepInfra's full native API capabilities while OpenClaw stays blissfully unaware. Deploy this first for your CSO (DeepSeek-V3.2), then replicate for CTO (GLM-5 via DeepInfra or Fireworks).
-

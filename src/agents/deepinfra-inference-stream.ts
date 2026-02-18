@@ -1,8 +1,10 @@
 import type { StreamFn } from "@mariozechner/pi-agent-core";
 import type {
   AssistantMessage,
+  AssistantMessageEvent,
   StopReason,
   TextContent,
+  ThinkingContent,
   ToolCall,
   Tool,
   Usage,
@@ -83,6 +85,7 @@ interface OpenAIChatRequest {
   model: string;
   messages: OpenAIChatMessage[];
   stream: boolean;
+  stream_options?: { include_usage: boolean };
   tools?: OpenAIToolDef[];
   tool_choice?: "auto" | "none";
   temperature?: number;
@@ -274,6 +277,19 @@ function extractOpenAIToolDefs(tools: Tool[] | undefined): OpenAIToolDef[] {
 
 // ── SSE streaming parser ────────────────────────────────────────────────────
 
+function* extractSseDataLines(rawBuffer: string): Generator<string> {
+  for (const line of rawBuffer.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) {
+      continue;
+    }
+    const jsonStr = trimmed.slice(5).trim();
+    if (jsonStr && jsonStr !== "[DONE]") {
+      yield jsonStr;
+    }
+  }
+}
+
 export async function* parseSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
 ): AsyncGenerator<DeepInfraStreamChunk> {
@@ -291,15 +307,7 @@ export async function* parseSseStream(
     buffer = events.pop() ?? "";
 
     for (const event of events) {
-      for (const line of event.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) {
-          continue;
-        }
-        const jsonStr = trimmed.slice(5).trim();
-        if (!jsonStr || jsonStr === "[DONE]") {
-          continue;
-        }
+      for (const jsonStr of extractSseDataLines(event)) {
         try {
           yield JSON.parse(jsonStr) as DeepInfraStreamChunk;
         } catch {
@@ -310,15 +318,7 @@ export async function* parseSseStream(
   }
 
   if (buffer.trim()) {
-    for (const line of buffer.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-      const jsonStr = trimmed.slice(5).trim();
-      if (!jsonStr || jsonStr === "[DONE]") {
-        continue;
-      }
+    for (const jsonStr of extractSseDataLines(buffer)) {
       try {
         yield JSON.parse(jsonStr) as DeepInfraStreamChunk;
       } catch {
@@ -332,6 +332,8 @@ export async function* parseSseStream(
 }
 
 // ── OpenAI SSE streaming parser ─────────────────────────────────────────────
+// SSE events are delimited by double newlines; split on \n\n first,
+// then extract data: lines from each event (matching the native parser).
 
 async function* parseOpenAISseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -346,36 +348,22 @@ async function* parseOpenAISseStream(
     }
     buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-      const jsonStr = trimmed.slice(5).trim();
-      if (!jsonStr || jsonStr === "[DONE]") {
-        continue;
-      }
-      try {
-        yield JSON.parse(jsonStr) as OpenAIChatStreamDelta;
-      } catch {
-        console.warn("[deepinfra-chat] Skipping malformed SSE data:", jsonStr.slice(0, 120));
+    for (const event of events) {
+      for (const jsonStr of extractSseDataLines(event)) {
+        try {
+          yield JSON.parse(jsonStr) as OpenAIChatStreamDelta;
+        } catch {
+          console.warn("[deepinfra-chat] Skipping malformed SSE data:", jsonStr.slice(0, 120));
+        }
       }
     }
   }
 
   if (buffer.trim()) {
-    for (const line of buffer.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-      const jsonStr = trimmed.slice(5).trim();
-      if (!jsonStr || jsonStr === "[DONE]") {
-        continue;
-      }
+    for (const jsonStr of extractSseDataLines(buffer)) {
       try {
         yield JSON.parse(jsonStr) as OpenAIChatStreamDelta;
       } catch {
@@ -388,93 +376,44 @@ async function* parseOpenAISseStream(
   }
 }
 
-// ── Response conversion ─────────────────────────────────────────────────────
+// ── Shared helpers for building the partial AssistantMessage ─────────────────
 
-function buildNativeAssistantMessage(params: {
-  text: string;
-  inputTokens: number;
-  outputTokens: number;
-  finishReason?: string;
-  modelInfo: { api: string; provider: string; id: string };
-}): AssistantMessage {
-  const content: TextContent[] = [];
-  if (params.text) {
-    content.push({ type: "text", text: params.text });
-  }
-
-  const stopReason: StopReason = "stop";
-
-  const usage: Usage = {
-    input: params.inputTokens,
-    output: params.outputTokens,
+function makeEmptyUsage(): Usage {
+  return {
+    input: 0,
+    output: 0,
     cacheRead: 0,
     cacheWrite: 0,
-    totalTokens: params.inputTokens + params.outputTokens,
+    totalTokens: 0,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
+}
 
+function makePartialAssistantMessage(modelInfo: {
+  api: string;
+  provider: string;
+  id: string;
+}): AssistantMessage {
   return {
     role: "assistant",
-    content,
-    stopReason,
-    api: params.modelInfo.api,
-    provider: params.modelInfo.provider,
-    model: params.modelInfo.id,
-    usage,
+    content: [],
+    stopReason: "stop",
+    api: modelInfo.api,
+    provider: modelInfo.provider,
+    model: modelInfo.id,
+    usage: makeEmptyUsage(),
     timestamp: Date.now(),
   };
 }
 
-function buildChatAssistantMessage(params: {
-  text: string;
-  toolCalls: Array<{ id: string; name: string; arguments: string }>;
-  inputTokens: number;
-  outputTokens: number;
-  finishReason?: string;
-  modelInfo: { api: string; provider: string; id: string };
-}): AssistantMessage {
-  const content: (TextContent | ToolCall)[] = [];
-
-  if (params.text) {
-    content.push({ type: "text", text: params.text });
-  }
-
-  for (const tc of params.toolCalls) {
-    let args: Record<string, unknown>;
-    try {
-      args = JSON.parse(tc.arguments) as Record<string, unknown>;
-    } catch {
-      args = {};
-    }
-    content.push({
-      type: "toolCall",
-      id: tc.id || `deepinfra_call_${randomUUID()}`,
-      name: tc.name,
-      arguments: args,
-    });
-  }
-
-  const hasToolCalls = params.toolCalls.length > 0;
-  const stopReason: StopReason = hasToolCalls ? "toolUse" : "stop";
-
-  const usage: Usage = {
-    input: params.inputTokens,
-    output: params.outputTokens,
+function finalizeUsage(output: AssistantMessage, inputTokens: number, outputTokens: number): void {
+  output.usage = {
+    input: inputTokens,
+    output: outputTokens,
     cacheRead: 0,
     cacheWrite: 0,
-    totalTokens: params.inputTokens + params.outputTokens,
+    totalTokens: inputTokens + outputTokens,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-
-  return {
-    role: "assistant",
-    content,
-    stopReason,
-    api: params.modelInfo.api,
-    provider: params.modelInfo.provider,
-    model: params.modelInfo.id,
-    usage,
-    timestamp: Date.now(),
   };
 }
 
@@ -499,10 +438,8 @@ export function createDeepInfraInferenceStreamFn(baseUrl: string): StreamFn {
     const run = async () => {
       try {
         if (hasTools) {
-          // ── OpenAI-compatible chat path (tool calling supported) ───
           await runOpenAIChatPath(stream, model, context, options, tools);
         } else {
-          // ── Native inference path (lower latency, no tools) ────────
           await runNativeInferencePath(stream, model, context, options, baseUrl);
         }
       } catch (err) {
@@ -518,14 +455,7 @@ export function createDeepInfraInferenceStreamFn(baseUrl: string): StreamFn {
             api: model.api,
             provider: model.provider,
             model: model.id,
-            usage: {
-              input: 0,
-              output: 0,
-              cacheRead: 0,
-              cacheWrite: 0,
-              totalTokens: 0,
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-            },
+            usage: makeEmptyUsage(),
             timestamp: Date.now(),
           },
         });
@@ -539,7 +469,10 @@ export function createDeepInfraInferenceStreamFn(baseUrl: string): StreamFn {
   };
 }
 
-// ── Native inference path (original, no tool support) ───────────────────────
+// ── Native inference path (no tool support) ─────────────────────────────────
+// Emits full streaming lifecycle: start → thinking_start/delta/end →
+// text_start/delta/end → done so the agent-loop and TUI receive events
+// incrementally instead of only a single "done" at the end.
 
 async function runNativeInferencePath(
   stream: ReturnType<typeof createAssistantMessageEventStream>,
@@ -588,19 +521,110 @@ async function runNativeInferencePath(
     throw new Error("DeepInfra inference API returned empty response body");
   }
 
+  const modelInfo = { api: model.api, provider: model.provider, id: model.id };
+  const output = makePartialAssistantMessage(modelInfo);
+
+  stream.push({ type: "start", partial: output });
+
   const reader = response.body.getReader();
-  let accumulatedText = "";
   let inputTokens = 0;
   let outputTokens = 0;
-  let finishReason: string | undefined;
+
+  // Kimi-K2.5 native inference returns raw token stream that starts inside
+  // a <think> block (the prompt ends with "<think>"). We track whether
+  // we're still in the thinking section and split into thinking + text
+  // content blocks accordingly.
+  let inThinking = true;
+  let thinkingBlock: ThinkingContent | null = null;
+  let textBlock: TextContent | null = null;
 
   for await (const chunk of parseSseStream(reader)) {
     if (chunk.token?.text && !chunk.token.special) {
-      accumulatedText += chunk.token.text;
+      let tokenText = chunk.token.text;
+
+      if (inThinking) {
+        const closeIdx = tokenText.indexOf(THINK_CLOSE);
+        if (closeIdx !== -1) {
+          // Transition: end of thinking, start of text
+          const thinkPart = tokenText.slice(0, closeIdx);
+          const textPart = tokenText.slice(closeIdx + THINK_CLOSE.length);
+
+          if (thinkPart) {
+            if (!thinkingBlock) {
+              thinkingBlock = { type: "thinking", thinking: "" };
+              output.content.push(thinkingBlock);
+              stream.push({
+                type: "thinking_start",
+                contentIndex: output.content.length - 1,
+                partial: output,
+              });
+            }
+            thinkingBlock.thinking += thinkPart;
+            stream.push({
+              type: "thinking_delta",
+              contentIndex: output.content.length - 1,
+              delta: thinkPart,
+              partial: output,
+            });
+          }
+
+          if (thinkingBlock) {
+            stream.push({
+              type: "thinking_end",
+              contentIndex: output.content.indexOf(thinkingBlock),
+              content: thinkingBlock.thinking,
+              partial: output,
+            });
+          }
+
+          inThinking = false;
+          tokenText = textPart;
+          // fall through to handle remaining text below
+        } else {
+          // Still in thinking
+          if (!thinkingBlock) {
+            thinkingBlock = { type: "thinking", thinking: "" };
+            output.content.push(thinkingBlock);
+            stream.push({
+              type: "thinking_start",
+              contentIndex: output.content.length - 1,
+              partial: output,
+            });
+          }
+          thinkingBlock.thinking += tokenText;
+          stream.push({
+            type: "thinking_delta",
+            contentIndex: output.content.length - 1,
+            delta: tokenText,
+            partial: output,
+          });
+          continue;
+        }
+      }
+
+      // Text content (post-thinking or no thinking)
+      if (tokenText) {
+        if (!textBlock) {
+          textBlock = { type: "text", text: "" };
+          output.content.push(textBlock);
+          stream.push({
+            type: "text_start",
+            contentIndex: output.content.length - 1,
+            partial: output,
+          });
+        }
+        textBlock.text += tokenText;
+        stream.push({
+          type: "text_delta",
+          contentIndex: output.content.length - 1,
+          delta: tokenText,
+          partial: output,
+        });
+      }
     }
 
     if (chunk.details?.finish_reason) {
-      finishReason = chunk.details.finish_reason;
+      output.stopReason = "stop";
     }
     if (typeof chunk.num_input_tokens === "number") {
       inputTokens = chunk.num_input_tokens;
@@ -610,28 +634,36 @@ async function runNativeInferencePath(
     }
   }
 
-  const fullText = `${THINK_OPEN}${accumulatedText}`;
+  // Close any open blocks
+  if (inThinking && thinkingBlock) {
+    stream.push({
+      type: "thinking_end",
+      contentIndex: output.content.indexOf(thinkingBlock),
+      content: thinkingBlock.thinking,
+      partial: output,
+    });
+  }
+  if (textBlock) {
+    stream.push({
+      type: "text_end",
+      contentIndex: output.content.indexOf(textBlock),
+      content: textBlock.text,
+      partial: output,
+    });
+  }
 
-  const assistantMessage = buildNativeAssistantMessage({
-    text: fullText,
-    inputTokens,
-    outputTokens,
-    finishReason,
-    modelInfo: {
-      api: model.api,
-      provider: model.provider,
-      id: model.id,
-    },
-  });
+  finalizeUsage(output, inputTokens, outputTokens);
 
   stream.push({
     type: "done",
     reason: "stop",
-    message: assistantMessage,
+    message: output,
   });
 }
 
 // ── OpenAI-compatible chat path (tool calling supported) ────────────────────
+// Emits full streaming lifecycle: start → text/toolcall start/delta/end →
+// done so the agent-loop and TUI receive events incrementally.
 
 async function runOpenAIChatPath(
   stream: ReturnType<typeof createAssistantMessageEventStream>,
@@ -646,6 +678,7 @@ async function runOpenAIChatPath(
     model: model.id,
     messages: chatMessages,
     stream: true,
+    stream_options: { include_usage: true },
     tools,
     tool_choice: "auto",
   };
@@ -680,18 +713,53 @@ async function runOpenAIChatPath(
     throw new Error("DeepInfra chat API returned empty response body");
   }
 
+  const modelInfo = { api: model.api, provider: model.provider, id: model.id };
+  const output = makePartialAssistantMessage(modelInfo);
+
+  stream.push({ type: "start", partial: output });
+
   const reader = response.body.getReader();
-  let accumulatedContent = "";
   let inputTokens = 0;
   let outputTokens = 0;
-  let finishReason: string | undefined;
 
-  // Accumulate streaming tool_calls: keyed by index
-  const toolCallAccumulator = new Map<number, { id: string; name: string; arguments: string }>();
+  // Track the current open block so we can emit start/delta/end properly.
+  let currentBlock: (TextContent | (ToolCall & { partialArgs: string })) | null = null;
+  const blockIndex = () => output.content.length - 1;
+
+  const finishCurrentBlock = () => {
+    if (!currentBlock) {
+      return;
+    }
+    if (currentBlock.type === "text") {
+      stream.push({
+        type: "text_end",
+        contentIndex: blockIndex(),
+        content: currentBlock.text,
+        partial: output,
+      });
+    } else if (currentBlock.type === "toolCall") {
+      const tc = currentBlock as ToolCall & { partialArgs: string };
+      try {
+        tc.arguments = JSON.parse(tc.partialArgs) as Record<string, unknown>;
+      } catch {
+        tc.arguments = {};
+      }
+      delete (tc as unknown as Record<string, unknown>).partialArgs;
+      stream.push({
+        type: "toolcall_end",
+        contentIndex: blockIndex(),
+        toolCall: tc,
+        partial: output,
+      });
+    }
+    currentBlock = null;
+  };
+
+  // Map from SSE tool_call index → output content index
+  const toolCallIndexMap = new Map<number, number>();
 
   for await (const chunk of parseOpenAISseStream(reader)) {
     if (!chunk.choices || chunk.choices.length === 0) {
-      // Usage-only chunk (sent at end with stream_options)
       if (chunk.usage) {
         inputTokens = chunk.usage.prompt_tokens ?? inputTokens;
         outputTokens = chunk.usage.completion_tokens ?? outputTokens;
@@ -702,33 +770,73 @@ async function runOpenAIChatPath(
     const choice = chunk.choices[0];
     const delta = choice.delta;
 
+    // Text content deltas
     if (delta.content) {
-      accumulatedContent += delta.content;
+      if (!currentBlock || currentBlock.type !== "text") {
+        finishCurrentBlock();
+        const block: TextContent = { type: "text", text: "" };
+        currentBlock = block;
+        output.content.push(block);
+        stream.push({ type: "text_start", contentIndex: blockIndex(), partial: output });
+      }
+      currentBlock.text += delta.content;
+      stream.push({
+        type: "text_delta",
+        contentIndex: blockIndex(),
+        delta: delta.content,
+        partial: output,
+      });
     }
 
+    // Tool call deltas
     if (delta.tool_calls) {
       for (const tc of delta.tool_calls) {
-        const idx = tc.index;
-        const existing = toolCallAccumulator.get(idx);
-        if (!existing) {
-          toolCallAccumulator.set(idx, {
+        const sseIdx = tc.index;
+        let contentIdx = toolCallIndexMap.get(sseIdx);
+
+        if (contentIdx === undefined) {
+          // New tool call — finish any open block first
+          finishCurrentBlock();
+
+          const toolBlock: ToolCall & { partialArgs: string } = {
+            type: "toolCall",
             id: tc.id ?? `deepinfra_call_${randomUUID()}`,
             name: tc.function?.name ?? "",
-            arguments: tc.function?.arguments ?? "",
-          });
+            arguments: {},
+            partialArgs: tc.function?.arguments ?? "",
+          };
+          output.content.push(toolBlock);
+          contentIdx = output.content.length - 1;
+          toolCallIndexMap.set(sseIdx, contentIdx);
+          currentBlock = toolBlock;
+
+          stream.push({ type: "toolcall_start", contentIndex: contentIdx, partial: output });
         } else {
+          // Continuation of an existing tool call
+          const existing = output.content[contentIdx] as ToolCall & { partialArgs: string };
           if (tc.function?.name) {
             existing.name += tc.function.name;
           }
           if (tc.function?.arguments) {
-            existing.arguments += tc.function.arguments;
+            existing.partialArgs += tc.function.arguments;
           }
+          // Keep currentBlock pointing at this tool call for proper finishCurrentBlock
+          currentBlock = existing;
         }
+
+        const argDelta = tc.function?.arguments ?? "";
+        stream.push({
+          type: "toolcall_delta",
+          contentIndex: contentIdx,
+          delta: argDelta,
+          partial: output,
+        } as AssistantMessageEvent);
       }
     }
 
     if (choice.finish_reason) {
-      finishReason = choice.finish_reason;
+      output.stopReason =
+        choice.finish_reason === "tool_calls" ? "toolUse" : ("stop" as StopReason);
     }
 
     if (chunk.usage) {
@@ -737,27 +845,38 @@ async function runOpenAIChatPath(
     }
   }
 
-  const collectedToolCalls = Array.from(toolCallAccumulator.values());
+  // Close any remaining open block
+  finishCurrentBlock();
 
-  const assistantMessage = buildChatAssistantMessage({
-    text: accumulatedContent,
-    toolCalls: collectedToolCalls,
-    inputTokens,
-    outputTokens,
-    finishReason,
-    modelInfo: {
-      api: model.api,
-      provider: model.provider,
-      id: model.id,
-    },
-  });
+  // Finalize all tool call arguments for any tool blocks that weren't the
+  // "currentBlock" when the stream ended (parallel tool calls).
+  for (const [, contentIdx] of toolCallIndexMap) {
+    const block = output.content[contentIdx];
+    if (block && block.type === "toolCall" && "partialArgs" in block) {
+      const tc = block as ToolCall & { partialArgs: string };
+      try {
+        tc.arguments = JSON.parse(tc.partialArgs) as Record<string, unknown>;
+      } catch {
+        tc.arguments = {};
+      }
+      delete (tc as unknown as Record<string, unknown>).partialArgs;
+    }
+  }
+
+  // Determine stop reason from content if not already set by finish_reason
+  const hasToolCalls = output.content.some((b) => b.type === "toolCall");
+  if (hasToolCalls) {
+    output.stopReason = "toolUse";
+  }
+
+  finalizeUsage(output, inputTokens, outputTokens);
 
   const reason: Extract<StopReason, "stop" | "toolUse"> =
-    assistantMessage.stopReason === "toolUse" ? "toolUse" : "stop";
+    output.stopReason === "toolUse" ? "toolUse" : "stop";
 
   stream.push({
     type: "done",
     reason,
-    message: assistantMessage,
+    message: output,
   });
 }

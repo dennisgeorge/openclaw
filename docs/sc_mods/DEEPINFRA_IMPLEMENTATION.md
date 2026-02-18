@@ -7,24 +7,28 @@ Successfully implemented native DeepInfra API support for OpenClaw, enabling ful
 ## What Was Implemented
 
 ### 1. Core Model Catalog (`src/agents/deepinfra-models.ts`)
+
 - Created comprehensive model catalog with 10 popular models
 - Includes DeepSeek V3, DeepSeek R1, Llama 3.1/3.3 70B, Qwen 2.5 72B, and more
 - Configured with accurate pricing, context windows, and capabilities
 - Built model definition builder following OpenClaw conventions
 
 ### 2. Provider Configuration (`src/commands/onboard-auth.config-deepinfra.ts`)
+
 - Implemented `applyDeepInfraProviderConfig()` for adding DeepInfra without changing defaults
 - Implemented `applyDeepInfraConfig()` for setting DeepInfra as default provider
 - Uses native API endpoint: `https://api.deepinfra.com/v1/openai`
 - Follows established OpenClaw provider pattern
 
 ### 3. Authentication & Credentials
+
 - Added `setDeepInfraApiKey()` in `src/commands/onboard-auth.credentials.ts`
 - Defined `DEEPINFRA_DEFAULT_MODEL_REF` constant
 - Integrated with OpenClaw's auth profile system
 - Added environment variable support: `DEEPINFRA_API_KEY` in `src/agents/model-auth.ts`
 
 ### 4. Onboarding Integration
+
 - Added `deepinfra-api-key` auth choice type in `src/commands/onboard-types.ts`
 - Added `deepinfra` group to `AuthChoiceGroupId`
 - Updated `auth-choice-options.ts` with DeepInfra in provider list
@@ -35,10 +39,12 @@ Successfully implemented native DeepInfra API support for OpenClaw, enabling ful
   - Default model configuration
 
 ### 5. Export Configuration
+
 - Updated `src/commands/onboard-auth.ts` to export all DeepInfra functions
 - Properly exposed configuration helpers, constants, and auth functions
 
 ### 6. Documentation
+
 - Created comprehensive provider documentation: `docs/providers/deepinfra.md`
 - Includes quick start guide, environment setup, and model catalog
 - Explains benefits of native API vs compatibility layers
@@ -48,7 +54,9 @@ Successfully implemented native DeepInfra API support for OpenClaw, enabling ful
 ## Technical Implementation Details
 
 ### Architecture Pattern
+
 The implementation follows OpenClaw's established provider pattern:
+
 1. Model catalog with builder function
 2. Provider config functions (with and without default model)
 3. Credential management through auth profiles
@@ -57,12 +65,14 @@ The implementation follows OpenClaw's established provider pattern:
 6. Documentation
 
 ### API Compatibility
+
 - Uses OpenAI-compatible endpoint (`openai-completions` API)
 - Native DeepInfra endpoint for optimal performance
 - Supports all standard OpenAI parameters
 - Access to DeepInfra-specific parameters via native API
 
 ### Files Modified
+
 1. `src/agents/deepinfra-models.ts` - NEW
 2. `src/commands/onboard-auth.config-deepinfra.ts` - NEW
 3. `src/commands/onboard-auth.credentials.ts` - UPDATED
@@ -77,11 +87,13 @@ The implementation follows OpenClaw's established provider pattern:
 ## Usage Examples
 
 ### Interactive Onboarding
+
 ```bash
 openclaw onboard --auth-choice deepinfra-api-key
 ```
 
 ### Non-Interactive Setup
+
 ```bash
 openclaw onboard --non-interactive \
   --mode local \
@@ -91,12 +103,14 @@ openclaw onboard --non-interactive \
 ```
 
 ### Environment Variable
+
 ```bash
 export DEEPINFRA_API_KEY="your-api-key-here"
 openclaw start
 ```
 
 ### Configuration
+
 ```json5
 {
   models: {
@@ -104,14 +118,14 @@ openclaw start
       deepinfra: {
         baseUrl: "https://api.deepinfra.com/v1/openai",
         api: "openai-completions",
-      }
-    }
+      },
+    },
   },
   agents: {
     defaults: {
-      model: { primary: "deepinfra/deepseek-ai/DeepSeek-V3" }
-    }
-  }
+      model: { primary: "deepinfra/deepseek-ai/DeepSeek-V3" },
+    },
+  },
 }
 ```
 
@@ -157,6 +171,7 @@ openclaw start
 ## Conclusion
 
 The DeepInfra integration is complete and production-ready. Users can now:
+
 - Authenticate via interactive or non-interactive onboarding
 - Use environment variables for API key management
 - Access 10+ popular open-source models through native API

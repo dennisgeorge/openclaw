@@ -3,6 +3,7 @@
 ## Quick Test Checklist
 
 ### 1. Interactive Onboarding Test
+
 ```bash
 cd openclaw
 npm run build  # or your build command
@@ -12,12 +13,14 @@ openclaw onboard --auth-choice deepinfra-api-key
 ```
 
 Expected behavior:
+
 - Should show "DeepInfra" information message with API key URL
 - Should prompt for API key input
 - Should set up provider configuration
 - Should set default model to `deepinfra/deepseek-ai/DeepSeek-V3`
 
 ### 2. Non-Interactive Test
+
 ```bash
 # Set your API key
 export DEEPINFRA_API_KEY="your-test-key-here"
@@ -31,11 +34,13 @@ openclaw onboard --non-interactive \
 ```
 
 Expected behavior:
+
 - Should complete without prompts
 - Should configure DeepInfra provider
 - Should store API key in auth profile
 
 ### 3. Environment Variable Detection Test
+
 ```bash
 # Set environment variable
 export DEEPINFRA_API_KEY="test-key-123"
@@ -45,6 +50,7 @@ openclaw onboard --auth-choice deepinfra-api-key
 ```
 
 Expected behavior:
+
 - Should detect `DEEPINFRA_API_KEY` from environment
 - Should prompt to use existing key
 - Should show key preview (e.g., "test...123")
@@ -59,24 +65,27 @@ openclaw config get
 ```
 
 Should show:
+
 ```json5
 {
-  "models": {
-    "providers": {
-      "deepinfra": {
-        "baseUrl": "https://api.deepinfra.com/v1/openai",
-        "api": "openai-completions",
-        "models": [ /* ... model list ... */ ]
-      }
-    }
+  models: {
+    providers: {
+      deepinfra: {
+        baseUrl: "https://api.deepinfra.com/v1/openai",
+        api: "openai-completions",
+        models: [
+          /* ... model list ... */
+        ],
+      },
+    },
   },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "deepinfra/deepseek-ai/DeepSeek-V3"
-      }
-    }
-  }
+  agents: {
+    defaults: {
+      model: {
+        primary: "deepinfra/deepseek-ai/DeepSeek-V3",
+      },
+    },
+  },
 }
 ```
 
@@ -90,6 +99,7 @@ openclaw chat "What is 2+2?"
 ```
 
 Expected behavior:
+
 - Should use DeepInfra API
 - Should get response from DeepSeek V3 model
 - Check logs for API endpoint (should be api.deepinfra.com)
@@ -116,6 +126,7 @@ openclaw models list | grep deepinfra
 ```
 
 Should show:
+
 - deepseek-ai/DeepSeek-V3
 - deepseek-ai/DeepSeek-R1
 - meta-llama/Meta-Llama-3.1-70B-Instruct
@@ -152,18 +163,21 @@ cat openclaw/docs/providers/deepinfra.md
 ## Integration Test Scenarios
 
 ### Scenario 1: Fresh Installation
+
 1. New user onboards with DeepInfra
 2. Sets up API key
 3. Makes first API call
 4. Success ✓
 
 ### Scenario 2: Existing User Adding Provider
+
 1. User already has Anthropic configured
 2. Adds DeepInfra as additional provider
 3. Switches between providers
 4. Both work correctly ✓
 
 ### Scenario 3: Environment Variable Usage
+
 1. User sets DEEPINFRA_API_KEY in .env
 2. Starts OpenClaw gateway
 3. DeepInfra works without explicit onboarding
@@ -172,18 +186,23 @@ cat openclaw/docs/providers/deepinfra.md
 ## Common Issues & Troubleshooting
 
 ### Issue: "Provider not found"
+
 Solution: Make sure you rebuilt after adding the new provider:
+
 ```bash
 npm run build
 ```
 
 ### Issue: "API key invalid"
+
 Solution: Verify your API key at https://deepinfra.com/dash/api_keys
 
 ### Issue: "Model not available"
+
 Solution: Check model catalog is properly imported and models are defined
 
 ### Issue: Import errors
+
 Solution: Verify all exports in `onboard-auth.ts` include DeepInfra functions
 
 ## Success Criteria

@@ -58,22 +58,26 @@ is available to that process (for example, in `~/.clawdbot/.env` or via
 DeepInfra provides access to many popular open-source models with native API support:
 
 ### Reasoning & Coding Models
+
 - **DeepSeek V3** - Default model, powerful coding and reasoning (65K context)
 - **DeepSeek R1** - Advanced reasoning model with deep thought process
 - **QwQ 32B Preview** - Reasoning-focused model from Qwen
 
 ### Large Language Models
+
 - **Llama 3.1 70B Instruct** - Meta's flagship instruction model (128K context)
 - **Llama 3.3 70B Instruct** - Updated version with improved performance (131K context)
 - **Qwen 2.5 72B Instruct** - Alibaba's powerful multilingual model (131K context)
 - **Nvidia Llama 3.1 Nemotron 70B** - Optimized for accuracy and performance
 
 ### Specialized Models
+
 - **Mistral Mixtral 8x22B Instruct** - Mixture of experts architecture (65K context)
 - **Microsoft WizardLM 2 8x22B** - Enhanced reasoning and instruction following
 - **Google Gemma 2 27B IT** - Compact but capable model
 
 All models support:
+
 - OpenAI-compatible chat completions API
 - Native DeepInfra parameter control (temperature, top_p, repetition_penalty)
 - Model-specific optimizations for lower latency
