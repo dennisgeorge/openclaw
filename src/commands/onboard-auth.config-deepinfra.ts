@@ -1,10 +1,10 @@
-import type { OpenClawConfig } from "../config/config.js";
-import type { AgentModelEntryConfig } from "../config/types.agent-defaults.js";
 import {
   buildDeepInfraModelDefinition,
   DEEPINFRA_BASE_URL,
   DEEPINFRA_MODEL_CATALOG,
 } from "../agents/deepinfra-models.js";
+import type { OpenClawConfig } from "../config/config.js";
+import type { AgentModelEntryConfig } from "../config/types.agent-defaults.js";
 import {
   applyAgentDefaultModelPrimary,
   applyProviderConfigWithModelCatalog,

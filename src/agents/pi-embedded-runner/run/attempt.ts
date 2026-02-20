@@ -31,10 +31,6 @@ import {
   resolveChannelMessageToolHints,
 } from "../../channel-tools.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
-import {
-  createDeepInfraInferenceStreamFn,
-  DEEPINFRA_INFERENCE_BASE_URL,
-} from "../../deepinfra-inference-stream.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
@@ -638,10 +634,6 @@ export async function runEmbeddedAttempt(
           typeof providerConfig?.baseUrl === "string" ? providerConfig.baseUrl.trim() : "";
         const ollamaBaseUrl = modelBaseUrl || providerBaseUrl || OLLAMA_NATIVE_BASE_URL;
         activeSession.agent.streamFn = createOllamaStreamFn(ollamaBaseUrl);
-      } else if (params.model.api === "deepinfra-inference") {
-        // DeepInfra native inference API: lower latency than OpenAI-compat endpoint.
-        const deepinfraBaseUrl = DEEPINFRA_INFERENCE_BASE_URL;
-        activeSession.agent.streamFn = createDeepInfraInferenceStreamFn(deepinfraBaseUrl);
       } else {
         // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
         activeSession.agent.streamFn = streamSimple;

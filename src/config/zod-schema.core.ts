@@ -11,7 +11,6 @@ export const ModelApiSchema = z.union([
   z.literal("github-copilot"),
   z.literal("bedrock-converse-stream"),
   z.literal("ollama"),
-  z.literal("deepinfra-inference"),
 ]);
 
 export const ModelCompatSchema = z
